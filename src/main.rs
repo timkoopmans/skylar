@@ -4,18 +4,17 @@ use chrono::{Datelike, Utc};
 use clap::Parser;
 use futures::stream::StreamExt;
 use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::style::{Color, Style, Stylize};
+use ratatui::style::{Color, Style};
 use ratatui::widgets::Sparkline;
 
-use ratatui::text::Line;
-use ratatui::widgets::{Bar, BarChart, BarGroup, Block, Borders};
+use ratatui::widgets::{Block, Borders};
 use ratatui::Frame;
 use scylla::prepared_statement::PreparedStatement;
-use scylla::Session;
+use scylla::{Metrics, Session};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 pub mod db;
 mod logging;
@@ -28,7 +27,7 @@ struct Opt {
     read_threads: usize,
 
     /// Number of write threads
-    #[structopt(long, default_value = "10")]
+    #[structopt(long, default_value = "90")]
     write_threads: usize,
 }
 
@@ -40,7 +39,7 @@ async fn main() -> Result<()> {
 
     let session = db::connection::builder(true).await?;
 
-    let mut app = App::new(vec![]);
+    let mut app = App::new();
 
     let app_result = app.run(Arc::from(session), &opt).await;
     ratatui::restore();
@@ -49,47 +48,53 @@ async fn main() -> Result<()> {
 
 #[derive(Clone)]
 struct App {
-    bytes_sent: Vec<i32>,
-    bytes_sent_sparkline: Vec<u64>,
-    bytes_received: Vec<i32>,
-    bytes_received_sparkline: Vec<u64>,
+    queries_num: Vec<u64>,
+    queries_iter_num: Vec<u64>,
+    errors_num: Vec<u64>,
+    errors_iter_num: Vec<u64>,
+    latency_avg_ms: Vec<u64>,
+    latency_percentile_ms: Vec<u64>,
 }
 
 impl App {
-    fn new(devices: Vec<Device>) -> Self {
-        let bytes_sent: Vec<i32> = devices.iter().map(|d| d.bytes_sent).collect();
-        let bytes_sent_sparkline: Vec<u64> = bytes_sent.iter().map(|&b| b as u64).collect();
-        let bytes_received: Vec<i32> = devices.iter().map(|d| d.bytes_received).collect();
-        let bytes_received_sparkline: Vec<u64> = bytes_received.iter().map(|&b| b as u64).collect();
-
+    fn new() -> Self {
         Self {
-            bytes_sent,
-            bytes_sent_sparkline,
-            bytes_received,
-            bytes_received_sparkline,
+            queries_num: vec![],
+            queries_iter_num: vec![],
+            errors_num: vec![],
+            errors_iter_num: vec![],
+            latency_avg_ms: vec![],
+            latency_percentile_ms: vec![],
         }
     }
 
-    fn update_bytes_sent(&mut self, devices: &Vec<Device>) {
-        for device in devices {
-            self.bytes_sent.push(device.bytes_sent);
-            self.bytes_sent_sparkline.push(device.bytes_sent as u64);
-            self.bytes_received.push(device.bytes_received);
-            self.bytes_received_sparkline
-                .push(device.bytes_received as u64);
+    fn update_metrics(&mut self, metrics: &Metrics) {
+        self.queries_num.push(metrics.get_queries_num());
+        self.queries_iter_num.push(metrics.get_queries_iter_num());
+        self.errors_num.push(metrics.get_errors_num());
+        self.errors_iter_num.push(metrics.get_errors_iter_num());
+        self.latency_avg_ms
+            .push(metrics.get_latency_avg_ms().unwrap_or(0));
+        self.latency_percentile_ms
+            .push(metrics.get_latency_percentile_ms(99.9).unwrap_or(0));
 
-            if self.bytes_sent.len() > 100 {
-                self.bytes_sent.remove(0);
-            }
-            if self.bytes_sent_sparkline.len() > 100 {
-                self.bytes_sent_sparkline.remove(0);
-            }
-            if self.bytes_received.len() > 100 {
-                self.bytes_received.remove(0);
-            }
-            if self.bytes_received_sparkline.len() > 100 {
-                self.bytes_received_sparkline.remove(0);
-            }
+        if self.queries_num.len() > 100 {
+            self.queries_num.remove(0);
+        }
+        if self.queries_iter_num.len() > 100 {
+            self.queries_iter_num.remove(0);
+        }
+        if self.errors_num.len() > 100 {
+            self.errors_num.remove(0);
+        }
+        if self.errors_iter_num.len() > 100 {
+            self.errors_iter_num.remove(0);
+        }
+        if self.latency_avg_ms.len() > 100 {
+            self.latency_avg_ms.remove(0);
+        }
+        if self.latency_percentile_ms.len() > 100 {
+            self.latency_percentile_ms.remove(0);
         }
     }
 
@@ -99,30 +104,100 @@ impl App {
             .margin(1)
             .constraints(
                 [
-                    Constraint::Percentage(10),
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(10),
+                    Constraint::Percentage(16),
+                    Constraint::Percentage(16),
+                    Constraint::Percentage(16),
+                    Constraint::Percentage(16),
+                    Constraint::Percentage(16),
+                    Constraint::Percentage(16),
                 ]
                 .as_ref(),
             )
             .split(frame.area());
 
-        let bytes_sent_sparkline = Sparkline::default()
-            .block(Block::default().title("Bytes Sent").borders(Borders::ALL))
-            .data(&self.bytes_sent_sparkline)
-            .style(Style::default().fg(Color::LightBlue));
-        frame.render_widget(bytes_sent_sparkline, chunks[1]);
-
-        let bytes_received_sparkline = Sparkline::default()
+        let latency_avg_ms_title = format!(
+            "Average Latency (ms) (Last: {})",
+            self.latency_avg_ms.last().unwrap_or(&0)
+        );
+        let latency_avg_ms_sparkline = Sparkline::default()
             .block(
                 Block::default()
-                    .title("Bytes Received")
+                    .title(latency_avg_ms_title)
                     .borders(Borders::ALL),
             )
-            .data(&self.bytes_received_sparkline)
+            .data(&self.latency_avg_ms)
+            .style(Style::default().fg(Color::Magenta));
+        frame.render_widget(latency_avg_ms_sparkline, chunks[0]);
+
+        let latency_percentile_ms_title = format!(
+            "99.9 Latency Percentile (ms) (Last: {})",
+            self.latency_percentile_ms.last().unwrap_or(&0)
+        );
+        let latency_percentile_ms_sparkline = Sparkline::default()
+            .block(
+                Block::default()
+                    .title(latency_percentile_ms_title)
+                    .borders(Borders::ALL),
+            )
+            .data(&self.latency_percentile_ms)
+            .style(Style::default().fg(Color::Cyan));
+        frame.render_widget(latency_percentile_ms_sparkline, chunks[1]);
+
+        let queries_num_title = format!(
+            "Queries Requested (Last: {})",
+            self.queries_num.last().unwrap_or(&0)
+        );
+        let queries_num_sparkline = Sparkline::default()
+            .block(
+                Block::default()
+                    .title(queries_num_title)
+                    .borders(Borders::ALL),
+            )
+            .data(&self.queries_num)
+            .style(Style::default().fg(Color::LightBlue));
+        frame.render_widget(queries_num_sparkline, chunks[2]);
+
+        let queries_iter_num_title = format!(
+            "Iter Queries Requested (Last: {})",
+            self.queries_iter_num.last().unwrap_or(&0)
+        );
+        let queries_iter_num_sparkline = Sparkline::default()
+            .block(
+                Block::default()
+                    .title(queries_iter_num_title)
+                    .borders(Borders::ALL),
+            )
+            .data(&self.queries_iter_num)
             .style(Style::default().fg(Color::Green));
-        frame.render_widget(bytes_received_sparkline, chunks[2]);
+        frame.render_widget(queries_iter_num_sparkline, chunks[3]);
+
+        let errors_num_title = format!(
+            "Errors Occurred (Last: {})",
+            self.errors_num.last().unwrap_or(&0)
+        );
+        let errors_num_sparkline = Sparkline::default()
+            .block(
+                Block::default()
+                    .title(errors_num_title)
+                    .borders(Borders::ALL),
+            )
+            .data(&self.errors_num)
+            .style(Style::default().fg(Color::Red));
+        frame.render_widget(errors_num_sparkline, chunks[4]);
+
+        let errors_iter_num_title = format!(
+            "Iter Errors Occurred (Last: {})",
+            self.errors_iter_num.last().unwrap_or(&0)
+        );
+        let errors_iter_num_sparkline = Sparkline::default()
+            .block(
+                Block::default()
+                    .title(errors_iter_num_title)
+                    .borders(Borders::ALL),
+            )
+            .data(&self.errors_iter_num)
+            .style(Style::default().fg(Color::Yellow));
+        frame.render_widget(errors_iter_num_sparkline, chunks[5]);
     }
 
     async fn run(&mut self, session: Arc<Session>, opt: &Opt) -> Result<()> {
@@ -190,42 +265,18 @@ impl App {
             }
         });
 
-        let app_data = self.clone(); // Clone the necessary data
+        let app_data = self.clone();
         let app = Arc::new(Mutex::new(app_data));
         let session_clone = session.clone();
 
         let display_task = tokio::spawn(async move {
             let mut terminal = ratatui::init();
-            let statement: PreparedStatement = session_clone
-                .prepare(SELECT_DEVICE)
-                .await
-                .expect("Failed to prepare statement");
-            let now = Utc::now();
-            let year = now.year();
-            let month = now.month() as i32;
 
             loop {
-                let statement = statement.clone();
-                let mut interval = time::interval(Duration::from_millis(1000));
-                let rack_id = models::random_rack_id();
-                let sled_id = models::random_sled_id();
-                let mut rows_stream = session_clone
-                    .execute_iter(statement, (year, month, rack_id, sled_id))
-                    .await
-                    .expect("Failed to execute query")
-                    .into_typed::<Device>();
-
-                while let Some(next_row_res) = rows_stream.next().await {
-                    match next_row_res {
-                        Ok(device) => {
-                            debug!("Device: {:?}", device);
-                            let mut app = app.lock().await;
-                            app.update_bytes_sent(&vec![device]);
-                        }
-                        Err(e) => {
-                            error!("Error reading device: {}", e);
-                        }
-                    }
+                let metrics = session_clone.get_metrics();
+                {
+                    let mut app = app.lock().await;
+                    app.update_metrics(&metrics);
                 }
 
                 let app = app.lock().await;
@@ -233,7 +284,7 @@ impl App {
                     error!("Error drawing frame: {}", e);
                 }
 
-                interval.tick().await;
+                time::sleep(Duration::from_secs(1)).await;
             }
         });
 

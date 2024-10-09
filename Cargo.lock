@@ -1326,6 +1326,7 @@ dependencies = [
  "derive_more",
  "dotenv",
  "futures",
+ "once_cell",
  "rand",
  "ratatui",
  "scylla",
@@ -1336,6 +1337,7 @@ dependencies = [
  "tokio-retry",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

@@ -1,0 +1,14 @@
+services:
+  scylladb:
+    image: scylladb/scylla:6.1.1
+    volumes:
+      - scylla_data:/var/lib/scylla
+    shm_size: 4g
+    ports:
+      - "9042:9042"
+    restart: always
+    mem_limit: 4G
+    command: --smp 1
+
+volumes:
+  scylla_data:

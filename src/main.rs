@@ -1,4 +1,5 @@
-use crate::db::models::{Device, DeviceValues, User, UserValues};
+use crate::db::models::devices::{Device, DeviceValues};
+use crate::db::models::users::{User, UserValues};
 use anyhow::Result;
 use app::App;
 use clap::Parser;

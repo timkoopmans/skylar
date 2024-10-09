@@ -1,5 +1,5 @@
-pub const DDL: &str = r#"
-    CREATE KEYSPACE IF NOT EXISTS skylar WITH replication = 
+pub const DDL_DEVICES: &str = r#"
+    CREATE KEYSPACE IF NOT EXISTS skylar WITH replication =
     {'class': 'NetworkTopologyStrategy', 'replication_factor': <RF>};
 
     USE skylar;
@@ -22,4 +22,19 @@ pub const DDL: &str = r#"
         month            int,
         PRIMARY KEY ((year, month, rack_id, sled_id), time)
     )
-    "#;
+"#;
+
+// TODO: not implemented
+pub const DDL_USERS: &str = r#"
+    CREATE KEYSPACE IF NOT EXISTS skylar WITH replication =
+    {'class': 'NetworkTopologyStrategy', 'replication_factor': <RF>};
+
+    USE skylar;
+    CREATE TABLE IF NOT EXISTS skylar.users
+    (
+        user_id    uuid PRIMARY KEY,
+        username   text,
+        email      text,
+        created_at timestamp
+    )
+"#;

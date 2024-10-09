@@ -1,3 +1,4 @@
+use crate::db::models::{Device, DeviceValues, User, UserValues};
 use anyhow::Result;
 use app::App;
 use clap::Parser;
@@ -16,6 +17,10 @@ struct Opt {
     /// Number of write threads
     #[structopt(long, default_value = "90")]
     write_threads: usize,
+
+    /// Payload type
+    #[structopt(long, default_value = "devices")]
+    payload: String,
 }
 
 #[tokio::main]
@@ -24,12 +29,23 @@ async fn main() -> Result<()> {
     dotenv::dotenv().ok();
     logging::init();
 
-    let session = db::connection::builder(true).await?;
+    let session = db::connection::builder(true, &opt).await?;
 
     let mut app = App::new();
 
-    let display = app.run(Arc::from(session), &opt).await;
-
-    ratatui::restore();
-    display
+    match opt.payload.as_str() {
+        "devices" => {
+            let display = app
+                .run::<Device, DeviceValues>(Arc::from(session), &opt)
+                .await;
+            ratatui::restore();
+            display
+        }
+        "users" => {
+            let display = app.run::<User, UserValues>(Arc::from(session), &opt).await;
+            ratatui::restore();
+            display
+        }
+        _ => panic!("Unsupported payload type"),
+    }
 }

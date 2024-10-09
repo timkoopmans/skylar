@@ -1,7 +1,5 @@
-use crate::db::models;
-use crate::db::models::{generate_random_device, Device, INSERT_DEVICE, SELECT_DEVICE};
+use crate::db::models::{ReadPayload, WritePayload};
 use crate::Opt;
-use chrono::{Datelike, Utc};
 use futures::StreamExt;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::prelude::{Color, Style};
@@ -169,39 +167,41 @@ impl App {
         frame.render_widget(errors_iter_num_sparkline, chunks[5]);
     }
 
-    pub(crate) async fn run(&mut self, session: Arc<Session>, opt: &Opt) -> anyhow::Result<()> {
-        let opt = opt.clone();
+    pub async fn run<
+        W: WritePayload + scylla::serialize::row::SerializeRow + scylla::FromRow + std::fmt::Debug,
+        R: ReadPayload + scylla::serialize::row::SerializeRow + scylla::FromRow + std::fmt::Debug,
+    >(
+        &mut self,
+        session: Arc<Session>,
+        opt: &Opt,
+    ) -> anyhow::Result<()> {
         let session_clone = session.clone();
-
+        let opt = opt.clone();
         let read_task = tokio::spawn(async move {
             for _ in 0..opt.read_threads {
                 let session = session_clone.clone();
                 let statement: PreparedStatement = session
-                    .prepare(SELECT_DEVICE)
+                    .prepare(R::select_query())
                     .await
                     .expect("Failed to prepare statement");
-                let now = Utc::now();
-                let year = now.year();
-                let month = now.month() as i32;
                 tokio::spawn(async move {
                     loop {
                         let statement = statement.clone();
                         let mut interval = time::interval(Duration::from_millis(10));
-                        let rack_id = models::random_rack_id();
-                        let sled_id = models::random_sled_id();
+                        let payload = R::select_values();
                         let mut rows_stream = session
-                            .execute_iter(statement, (year, month, rack_id, sled_id))
+                            .execute_iter(statement, &payload)
                             .await
                             .expect("Failed to execute query")
-                            .into_typed::<Device>();
+                            .into_typed::<W>();
 
                         while let Some(next_row_res) = rows_stream.next().await {
                             match next_row_res {
-                                Ok(device) => {
-                                    debug!("Device: {:?}", device);
+                                Ok(payload) => {
+                                    debug!("{:?}", payload);
                                 }
                                 Err(e) => {
-                                    error!("Error reading device: {}", e);
+                                    error!("Error reading payload: {}", e);
                                 }
                             }
                         }
@@ -212,21 +212,21 @@ impl App {
             }
         });
 
-        let opt = opt.clone();
         let session_clone = session.clone();
+        let opt = opt.clone();
         let write_task = tokio::spawn(async move {
             for _ in 0..opt.write_threads {
                 let session = session_clone.clone();
                 let statement: PreparedStatement = session
-                    .prepare(INSERT_DEVICE)
+                    .prepare(W::insert_query())
                     .await
                     .expect("Failed to prepare statement");
                 tokio::spawn(async move {
                     loop {
                         let mut interval = time::interval(Duration::from_millis(10));
-                        let device = generate_random_device();
-                        if let Err(e) = session.execute_unpaged(&statement, &device).await {
-                            error!("Error inserting device: {}", e);
+                        let payload = W::insert_values();
+                        if let Err(e) = session.execute_unpaged(&statement, &payload).await {
+                            error!("Error inserting payload: {}", e);
                         }
                         interval.tick().await;
                     }
@@ -237,7 +237,6 @@ impl App {
         let app_data = self.clone();
         let app = Arc::new(Mutex::new(app_data));
         let session_clone = session.clone();
-
         let display_task = tokio::spawn(async move {
             let mut terminal = ratatui::init();
 

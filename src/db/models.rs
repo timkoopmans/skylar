@@ -6,6 +6,29 @@ use rand::Rng;
 use scylla::{FromRow, SerializeRow};
 use uuid::Uuid;
 
+pub trait WritePayload: Send + Sync + 'static {
+    fn insert_query() -> &'static str;
+    fn insert_values() -> Self;
+}
+
+pub trait ReadPayload: Send + Sync + 'static {
+    fn select_query() -> &'static str;
+    fn select_values() -> Self;
+}
+
+#[derive(Debug, Clone, SerializeRow, FromRow)]
+pub struct DeviceValues {
+    year: i32,
+    month: i32,
+    rack_id: Uuid,
+    sled_id: Uuid,
+}
+
+#[derive(Debug, Clone, SerializeRow, FromRow)]
+pub struct UserValues {
+    user_id: Uuid,
+}
+
 static POOL_RACKS: Lazy<Vec<Uuid>> = Lazy::new(|| {
     let size = 1000;
     (0..size).map(|_| Uuid::new_v4()).collect()
@@ -88,25 +111,104 @@ pub struct Device {
     pub month: i32,
 }
 
-pub fn generate_random_device() -> Device {
-    let mut rng = rand::thread_rng();
-    let now = Utc::now();
-    let string = Alphanumeric.sample_string(&mut rand::thread_rng(), 4);
-    Device {
-        kind: "vnic".to_string(),
-        link_name: format!("l-{}", string),
-        rack_id: random_rack_id(),
-        sled_id: random_sled_id(),
-        sled_model: format!("m-{}", string),
-        sled_revision: rng.gen_range(0..10),
-        sled_serial: format!("s-{}", string),
-        zone_name: format!("z-{}", string),
-        bytes_sent: rng.gen_range(0..1000),
-        bytes_received: rng.gen_range(0..1000),
-        packets_sent: rng.gen_range(1000..1000000),
-        packets_received: rng.gen_range(1000..1000000),
-        time: now,
-        year: now.year(),
-        month: now.month() as i32,
+impl WritePayload for Device {
+    fn insert_query() -> &'static str {
+        INSERT_DEVICE
+    }
+
+    fn insert_values() -> Self {
+        let mut rng = rand::thread_rng();
+        let now = Utc::now();
+        let string = Alphanumeric.sample_string(&mut rand::thread_rng(), 4);
+        Device {
+            kind: "vnic".to_string(),
+            link_name: format!("l-{}", string),
+            rack_id: Uuid::new_v4(),
+            sled_id: Uuid::new_v4(),
+            sled_model: format!("m-{}", string),
+            sled_revision: rng.gen_range(0..10),
+            sled_serial: format!("s-{}", string),
+            zone_name: format!("z-{}", string),
+            bytes_sent: rng.gen_range(0..1000),
+            bytes_received: rng.gen_range(0..1000),
+            packets_sent: rng.gen_range(1000..1000000),
+            packets_received: rng.gen_range(1000..1000000),
+            time: now,
+            year: now.year(),
+            month: now.month() as i32,
+        }
+    }
+}
+
+impl ReadPayload for DeviceValues {
+    fn select_query() -> &'static str {
+        SELECT_DEVICE
+    }
+
+    fn select_values() -> Self {
+        let now = Utc::now();
+        DeviceValues {
+            rack_id: random_rack_id(),
+            sled_id: random_sled_id(),
+            year: now.year(),
+            month: now.month() as i32,
+        }
+    }
+}
+
+pub const INSERT_USER: &str = "
+    INSERT INTO skylar.users
+    (
+        user_id,
+        username,
+        email,
+        created_at
+    )
+    VALUES (?, ?, ?, ?)
+";
+
+pub const SELECT_USER: &str = "
+    SELECT
+        user_id,
+        username,
+        email,
+        created_at
+    FROM skylar.users
+    WHERE user_id = ?
+";
+
+#[derive(Debug, Clone, SerializeRow, FromRow)]
+pub struct User {
+    pub user_id: Uuid,
+    pub username: String,
+    pub email: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl WritePayload for User {
+    fn insert_query() -> &'static str {
+        INSERT_USER
+    }
+
+    fn insert_values() -> Self {
+        let mut rng = rand::thread_rng();
+        User {
+            user_id: Uuid::new_v4(),
+            username: Alphanumeric.sample_string(&mut rng, 8),
+            email: format!("{}@example.com", Alphanumeric.sample_string(&mut rng, 8)),
+            created_at: Utc::now(),
+        }
+    }
+}
+
+impl ReadPayload for UserValues {
+    fn select_query() -> &'static str {
+        SELECT_USER
+    }
+
+    fn select_values() -> Self {
+        UserValues {
+            user_id: Uuid::new_v4(),
+        }
     }
 }

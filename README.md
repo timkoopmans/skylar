@@ -1,6 +1,6 @@
-![](img.png | width=64)
-
 # Skylar
+
+![img.png](img.png)
 
 A load testing tool for ScyllaDB
 

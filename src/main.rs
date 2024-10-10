@@ -27,13 +27,12 @@ struct Opt {
     password: String,
 
     /// Consistency level
-    /// Possible values: ONE, TWO, THREE, QUORUM, ALL, LOCAL_QUORUM, EACH_QUORUM, SERIAL, LOCAL_SERIAL, LOCAL_ONE
     /// Default value: LOCAL_QUORUM
     #[structopt(long, short = 'c', default_value = "LOCAL_QUORUM")]
     consistency_level: String,
 
     /// Replication factor
-    /// Default value: 1
+    /// Default value: 3
     #[structopt(long, short = 'r', default_value = "3")]
     replication_factor: i32,
 

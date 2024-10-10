@@ -11,6 +11,27 @@ mod logging;
 
 #[derive(Debug, Parser, Clone)]
 struct Opt {
+    /// Host
+    /// Default value: localhost:9042
+    #[structopt(long, default_value = "localhost:9042")]
+    host: String,
+
+    /// Consistency level
+    /// Possible values: ONE, TWO, THREE, QUORUM, ALL, LOCAL_QUORUM, EACH_QUORUM, SERIAL, LOCAL_SERIAL, LOCAL_ONE
+    /// Default value: LOCAL_QUORUM
+    #[structopt(long, short = 'c', default_value = "LOCAL_QUORUM")]
+    consistency_level: String,
+
+    /// Replication factor
+    /// Default value: 1
+    #[structopt(long, short = 'r', default_value = "1")]
+    replication_factor: i32,
+
+    /// Datacenter
+    /// Default value: datacenter1
+    #[structopt(long, short = 'd', default_value = "datacenter1")]
+    datacenter: String,
+
     /// Number of read threads
     #[structopt(long, default_value = "10")]
     read_threads: usize,

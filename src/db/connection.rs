@@ -1,4 +1,3 @@
-use std::env;
 use std::time::Duration;
 
 use crate::db::models::devices::DDL_DEVICES;
@@ -13,9 +12,9 @@ use tokio_retry::{strategy::ExponentialBackoff, Retry};
 use tracing::debug;
 
 pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
-    let scylladb_url = env::var("SCYLLADB_URL").expect("SCYLLADB_URL must be set");
+    let host = opt.host.clone();
 
-    let consistency = match env::var("CL").unwrap_or_default().to_uppercase().as_str() {
+    let consistency = match opt.consistency_level.to_uppercase().as_str() {
         "ONE" => Consistency::One,
         "TWO" => Consistency::Two,
         "THREE" => Consistency::Three,
@@ -29,15 +28,12 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
         _ => Consistency::LocalQuorum,
     };
 
-    debug!(
-        "Connecting to ScyllaDB at: {}  CL: {}",
-        scylladb_url, consistency
-    );
+    debug!("Connecting to ScyllaDB at: {}  CL: {}", host, consistency);
 
     let strategy = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(20));
 
     let session = Retry::spawn(strategy, || async {
-        let datacenter = env::var("DATACENTER").unwrap_or("datacenter1".to_string());
+        let datacenter = opt.datacenter.clone();
 
         let default_policy = DefaultPolicy::builder()
             .prefer_datacenter(datacenter)
@@ -53,7 +49,7 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
         let handle = profile.into_handle();
 
         SessionBuilder::new()
-            .known_node(&scylladb_url)
+            .known_node(&host)
             .default_execution_profile_handle(handle)
             .build()
             .await
@@ -62,7 +58,7 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
     .map_err(|e| anyhow!("Error connecting to the database: {}", e))?;
 
     if migrate {
-        let replication_factor = env::var("RF").unwrap_or("1".to_string());
+        let replication_factor = opt.replication_factor.to_string();
         let schema_query = match opt.payload.as_str() {
             "devices" => DDL_DEVICES,
             "users" => DDL_USERS,

@@ -1,7 +1,8 @@
 use std::env;
 use std::time::Duration;
 
-use crate::db::ddl::{DDL_DEVICES, DDL_USERS};
+use crate::db::models::devices::DDL_DEVICES;
+use crate::db::models::users::DDL_USERS;
 use crate::Opt;
 use anyhow::{anyhow, Result};
 use scylla::load_balancing::DefaultPolicy;

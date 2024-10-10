@@ -5,7 +5,6 @@ pub fn init() {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
-        // Disable colours on release builds
         .with_ansi(cfg!(debug_assertions))
         .compact()
         .init()

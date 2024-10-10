@@ -135,8 +135,8 @@ impl WritePayload for Device {
         Device {
             kind: "vnic".to_string(),
             link_name: format!("l-{}", string),
-            rack_id: Uuid::new_v4(),
-            sled_id: Uuid::new_v4(),
+            rack_id: random_rack_id(),
+            sled_id: random_sled_id(),
             sled_model: format!("m-{}", string),
             sled_revision: rng.gen_range(0..10),
             sled_serial: format!("s-{}", string),

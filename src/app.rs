@@ -4,12 +4,13 @@ use futures::StreamExt;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::prelude::{Color, Style};
 use ratatui::widgets::{Block, Borders, Sparkline};
+use ratatui::widgets::{List, ListItem};
 use ratatui::Frame;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::{Metrics, Session};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 use tokio::time;
 use tracing::{debug, error};
 
@@ -25,6 +26,7 @@ pub struct App {
     queries_iter_num_prev: u64,
     errors_num_prev: u64,
     errors_iter_num_prev: u64,
+    read_logs: Vec<String>,
 }
 
 impl App {
@@ -40,6 +42,7 @@ impl App {
             queries_iter_num_prev: 0,
             errors_num_prev: 0,
             errors_iter_num_prev: 0,
+            read_logs: vec![],
         }
     }
 
@@ -89,12 +92,13 @@ impl App {
             .margin(1)
             .constraints(
                 [
-                    Constraint::Percentage(16),
-                    Constraint::Percentage(16),
-                    Constraint::Percentage(16),
-                    Constraint::Percentage(16),
-                    Constraint::Percentage(16),
-                    Constraint::Percentage(16),
+                    Constraint::Percentage(14),
+                    Constraint::Percentage(14),
+                    Constraint::Percentage(14),
+                    Constraint::Percentage(14),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(10),
+                    Constraint::Percentage(24),
                 ]
                 .as_ref(),
             )
@@ -183,6 +187,16 @@ impl App {
             .data(&self.errors_iter_num)
             .style(Style::default().fg(Color::Yellow));
         frame.render_widget(errors_iter_num_sparkline, chunks[5]);
+
+        let items: Vec<ListItem> = self
+            .read_logs
+            .iter()
+            .map(|i| ListItem::new(i.as_str()))
+            .collect();
+        let read_logs_list = List::new(items)
+            .block(Block::default().title("Read Log").borders(Borders::ALL))
+            .style(Style::default().fg(Color::White));
+        frame.render_widget(read_logs_list, chunks[6]);
     }
 
     pub async fn run<
@@ -193,6 +207,8 @@ impl App {
         session: Arc<Session>,
         opt: &Opt,
     ) -> anyhow::Result<()> {
+        let (tx, mut rx) = mpsc::channel(100);
+
         let session_clone = session.clone();
         let opt = opt.clone();
         let read_task = tokio::spawn(async move {
@@ -202,6 +218,7 @@ impl App {
                     .prepare(R::select_query())
                     .await
                     .expect("Failed to prepare statement");
+                let tx = tx.clone();
                 tokio::spawn(async move {
                     loop {
                         let statement = statement.clone();
@@ -217,6 +234,9 @@ impl App {
                             match next_row_res {
                                 Ok(payload) => {
                                     debug!("{:?}", payload);
+                                    if tx.send(format!("{:?}", payload)).await.is_err() {
+                                        error!("Failed to send row to display task");
+                                    }
                                 }
                                 Err(e) => {
                                     error!("Error reading payload: {}", e);
@@ -263,6 +283,14 @@ impl App {
                 {
                     let mut app = app.lock().await;
                     app.update_metrics(&metrics);
+                }
+
+                while let Ok(row) = rx.try_recv() {
+                    let mut app = app.lock().await;
+                    app.read_logs.push(row);
+                    if app.read_logs.len() > 100 {
+                        app.read_logs.remove(0);
+                    }
                 }
 
                 let app = app.lock().await;

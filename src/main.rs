@@ -16,6 +16,16 @@ struct Opt {
     #[structopt(long, default_value = "localhost:9042")]
     host: String,
 
+    /// Username
+    /// Default value: cassandra
+    #[structopt(long, default_value = "cassandra")]
+    username: String,
+
+    /// Password
+    /// Default value: cassandra
+    #[structopt(long, default_value = "cassandra")]
+    password: String,
+
     /// Consistency level
     /// Possible values: ONE, TWO, THREE, QUORUM, ALL, LOCAL_QUORUM, EACH_QUORUM, SERIAL, LOCAL_SERIAL, LOCAL_ONE
     /// Default value: LOCAL_QUORUM

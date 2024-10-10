@@ -51,6 +51,7 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
         SessionBuilder::new()
             .known_node(&host)
             .default_execution_profile_handle(handle)
+            .user(opt.username.clone(), opt.password.clone())
             .build()
             .await
     })

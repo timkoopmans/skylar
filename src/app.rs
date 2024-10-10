@@ -222,7 +222,6 @@ impl App {
                 tokio::spawn(async move {
                     loop {
                         let statement = statement.clone();
-                        let mut interval = time::interval(Duration::from_millis(10));
                         let payload = R::select_values();
                         let mut rows_stream = session
                             .execute_iter(statement, &payload)
@@ -243,8 +242,6 @@ impl App {
                                 }
                             }
                         }
-
-                        interval.tick().await;
                     }
                 });
             }
@@ -261,12 +258,10 @@ impl App {
                     .expect("Failed to prepare statement");
                 tokio::spawn(async move {
                     loop {
-                        let mut interval = time::interval(Duration::from_millis(10));
                         let payload = W::insert_values();
                         if let Err(e) = session.execute_unpaged(&statement, &payload).await {
                             error!("Error inserting payload: {}", e);
                         }
-                        interval.tick().await;
                     }
                 });
             }

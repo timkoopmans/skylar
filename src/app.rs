@@ -21,6 +21,10 @@ pub struct App {
     errors_iter_num: Vec<u64>,
     latency_avg_ms: Vec<u64>,
     latency_percentile_ms: Vec<u64>,
+    queries_num_prev: u64,
+    queries_iter_num_prev: u64,
+    errors_num_prev: u64,
+    errors_iter_num_prev: u64,
 }
 
 impl App {
@@ -32,14 +36,28 @@ impl App {
             errors_iter_num: vec![],
             latency_avg_ms: vec![],
             latency_percentile_ms: vec![],
+            queries_num_prev: 0,
+            queries_iter_num_prev: 0,
+            errors_num_prev: 0,
+            errors_iter_num_prev: 0,
         }
     }
 
     fn update_metrics(&mut self, metrics: &Metrics) {
-        self.queries_num.push(metrics.get_queries_num());
-        self.queries_iter_num.push(metrics.get_queries_iter_num());
-        self.errors_num.push(metrics.get_errors_num());
-        self.errors_iter_num.push(metrics.get_errors_iter_num());
+        let queries_num_rate = metrics.get_queries_num() - self.queries_num_prev;
+        let queries_iter_num_rate = metrics.get_queries_iter_num() - self.queries_iter_num_prev;
+        let errors_num_rate = metrics.get_errors_num() - self.errors_num_prev;
+        let errors_iter_num_rate = metrics.get_errors_iter_num() - self.errors_iter_num_prev;
+
+        self.queries_num_prev = metrics.get_queries_num();
+        self.queries_iter_num_prev = metrics.get_queries_iter_num();
+        self.errors_num_prev = metrics.get_errors_num();
+        self.errors_iter_num_prev = metrics.get_errors_iter_num();
+
+        self.queries_num.push(queries_num_rate);
+        self.queries_iter_num.push(queries_iter_num_rate);
+        self.errors_num.push(errors_num_rate);
+        self.errors_iter_num.push(errors_iter_num_rate);
         self.latency_avg_ms
             .push(metrics.get_latency_avg_ms().unwrap_or(0));
         self.latency_percentile_ms
@@ -83,7 +101,7 @@ impl App {
             .split(frame.area());
 
         let latency_avg_ms_title = format!(
-            "Average Latency (ms) (Last: {})",
+            "Average Latency ({}ms)",
             self.latency_avg_ms.last().unwrap_or(&0)
         );
         let latency_avg_ms_sparkline = Sparkline::default()
@@ -97,7 +115,7 @@ impl App {
         frame.render_widget(latency_avg_ms_sparkline, chunks[0]);
 
         let latency_percentile_ms_title = format!(
-            "99.9 Latency Percentile (ms) (Last: {})",
+            "99.9 Latency Percentile ({}ms)",
             self.latency_percentile_ms.last().unwrap_or(&0)
         );
         let latency_percentile_ms_sparkline = Sparkline::default()
@@ -111,7 +129,7 @@ impl App {
         frame.render_widget(latency_percentile_ms_sparkline, chunks[1]);
 
         let queries_num_title = format!(
-            "Queries Requested (Last: {})",
+            "Queries Requested ({}/s)",
             self.queries_num.last().unwrap_or(&0)
         );
         let queries_num_sparkline = Sparkline::default()
@@ -125,7 +143,7 @@ impl App {
         frame.render_widget(queries_num_sparkline, chunks[2]);
 
         let queries_iter_num_title = format!(
-            "Iter Queries Requested (Last: {})",
+            "Iter Queries Requested ({}/s)",
             self.queries_iter_num.last().unwrap_or(&0)
         );
         let queries_iter_num_sparkline = Sparkline::default()
@@ -139,7 +157,7 @@ impl App {
         frame.render_widget(queries_iter_num_sparkline, chunks[3]);
 
         let errors_num_title = format!(
-            "Errors Occurred (Last: {})",
+            "Errors Occurred ({}/s)",
             self.errors_num.last().unwrap_or(&0)
         );
         let errors_num_sparkline = Sparkline::default()
@@ -153,7 +171,7 @@ impl App {
         frame.render_widget(errors_num_sparkline, chunks[4]);
 
         let errors_iter_num_title = format!(
-            "Iter Errors Occurred (Last: {})",
+            "Iter Errors Occurred ({}/s)",
             self.errors_iter_num.last().unwrap_or(&0)
         );
         let errors_iter_num_sparkline = Sparkline::default()

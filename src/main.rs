@@ -28,7 +28,7 @@ struct Opt {
     consistency_level: String,
 
     /// Replication factor
-    #[structopt(long, short = 'r', default_value = "1")]
+    #[structopt(long, short = 'r', default_value = "3")]
     replication_factor: i32,
 
     /// Datacenter

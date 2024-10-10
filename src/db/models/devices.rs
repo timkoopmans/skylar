@@ -85,7 +85,7 @@ pub const SELECT_DEVICE: &str = "
         bytes_received,
         packets_sent,
         packets_received,
-        time,
+        time
     FROM skylar.devices
     WHERE rack_id = ? AND sled_id = ? AND time > ?
 ";

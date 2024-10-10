@@ -1,5 +1,5 @@
 use crate::db::models::{ReadPayload, WritePayload};
-use chrono::{DateTime, Datelike, Utc};
+use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use rand::distributions::{Alphanumeric, DistString};
 use rand::prelude::SliceRandom;
@@ -27,9 +27,7 @@ pub const DDL_DEVICES: &str = r#"
         packets_sent     int,
         packets_received int,
         time             timestamp,
-        year             int,
-        month            int,
-        PRIMARY KEY ((year, month, rack_id, sled_id), time)
+        PRIMARY KEY ((rack_id, sled_id), time)
     )
 "#;
 
@@ -69,10 +67,8 @@ pub const INSERT_DEVICE: &str = "
         packets_sent,
         packets_received,
         time,
-        year,
-        month
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ";
 
 pub const SELECT_DEVICE: &str = "
@@ -90,10 +86,8 @@ pub const SELECT_DEVICE: &str = "
         packets_sent,
         packets_received,
         time,
-        year,
-        month
     FROM skylar.devices
-    WHERE year = ? AND month = ? AND rack_id = ? AND sled_id = ?
+    WHERE rack_id = ? AND sled_id = ? AND time > ?
 ";
 
 #[derive(Debug, Clone, SerializeRow, FromRow)]
@@ -111,16 +105,13 @@ pub struct Device {
     pub packets_sent: i32,
     pub packets_received: i32,
     pub time: DateTime<Utc>,
-    pub year: i32,
-    pub month: i32,
 }
 
 #[derive(Debug, Clone, SerializeRow, FromRow)]
 pub struct DeviceValues {
-    year: i32,
-    month: i32,
     rack_id: Uuid,
     sled_id: Uuid,
+    since: DateTime<Utc>,
 }
 
 impl WritePayload for Device {
@@ -146,8 +137,6 @@ impl WritePayload for Device {
             packets_sent: rng.gen_range(1000..1000000),
             packets_received: rng.gen_range(1000..1000000),
             time: now,
-            year: now.year(),
-            month: now.month() as i32,
         }
     }
 }
@@ -158,12 +147,11 @@ impl ReadPayload for DeviceValues {
     }
 
     fn select_values() -> Self {
-        let now = Utc::now();
+        let since = Utc::now() - chrono::Duration::seconds(5);
         DeviceValues {
             rack_id: random_rack_id(),
             sled_id: random_sled_id(),
-            year: now.year(),
-            month: now.month() as i32,
+            since,
         }
     }
 }

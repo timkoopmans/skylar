@@ -217,7 +217,7 @@ impl App {
                 let statement: PreparedStatement = session
                     .prepare(R::select_query())
                     .await
-                    .expect("Failed to prepare statement");
+                    .expect("Failed to prepare SELECT statement");
                 let tx = tx.clone();
                 tokio::spawn(async move {
                     loop {
@@ -255,7 +255,7 @@ impl App {
                 let statement: PreparedStatement = session
                     .prepare(W::insert_query())
                     .await
-                    .expect("Failed to prepare statement");
+                    .expect("Failed to prepare INSERT statement");
                 tokio::spawn(async move {
                     loop {
                         let payload = W::insert_values();

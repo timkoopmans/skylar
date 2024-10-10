@@ -66,7 +66,7 @@ pub const INSERT_DEVICE: &str = "
         bytes_received,
         packets_sent,
         packets_received,
-        time,
+        time
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ";

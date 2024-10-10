@@ -34,12 +34,12 @@ pub const DDL_DEVICES: &str = r#"
 "#;
 
 static POOL_RACKS: Lazy<Vec<Uuid>> = Lazy::new(|| {
-    let size = 1000;
+    let size = 100000;
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 
 static POOL_SLEDS: Lazy<Vec<Uuid>> = Lazy::new(|| {
-    let size = 10000;
+    let size = 100000;
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 

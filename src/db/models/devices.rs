@@ -111,7 +111,7 @@ pub struct Device {
 pub struct DeviceValues {
     rack_id: Uuid,
     sled_id: Uuid,
-    since: DateTime<Utc>,
+    time: DateTime<Utc>,
 }
 
 impl WritePayload for Device {
@@ -147,11 +147,11 @@ impl ReadPayload for DeviceValues {
     }
 
     fn select_values() -> Self {
-        let since = Utc::now() - chrono::Duration::seconds(5);
+        let time = Utc::now() - chrono::Duration::seconds(5);
         DeviceValues {
             rack_id: random_rack_id(),
             sled_id: random_sled_id(),
-            since,
+            time,
         }
     }
 }

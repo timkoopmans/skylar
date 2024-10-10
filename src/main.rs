@@ -34,7 +34,7 @@ struct Opt {
 
     /// Replication factor
     /// Default value: 1
-    #[structopt(long, short = 'r', default_value = "1")]
+    #[structopt(long, short = 'r', default_value = "3")]
     replication_factor: i32,
 
     /// Datacenter

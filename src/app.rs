@@ -212,7 +212,7 @@ impl App {
         let session_clone = session.clone();
         let opt = opt.clone();
         let read_task = tokio::spawn(async move {
-            for _ in 0..opt.read_threads {
+            for _ in 0..opt.readers {
                 let session = session_clone.clone();
                 let statement: PreparedStatement = session
                     .prepare(R::select_query())
@@ -250,7 +250,7 @@ impl App {
         let session_clone = session.clone();
         let opt = opt.clone();
         let write_task = tokio::spawn(async move {
-            for _ in 0..opt.write_threads {
+            for _ in 0..opt.writers {
                 let session = session_clone.clone();
                 let statement: PreparedStatement = session
                     .prepare(W::insert_query())

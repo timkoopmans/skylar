@@ -9,7 +9,8 @@ use uuid::Uuid;
 
 pub const DDL_DEVICES: &str = r#"
     CREATE KEYSPACE IF NOT EXISTS skylar WITH replication =
-    {'class': 'NetworkTopologyStrategy', 'replication_factor': <RF>};
+    {'class': 'NetworkTopologyStrategy', 'replication_factor': <RF>}
+    AND tablets = {'enabled': <TABLETS_ENABLED>, 'initial': <TABLETS>};
 
     USE skylar;
     CREATE TABLE IF NOT EXISTS skylar.devices

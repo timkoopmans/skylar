@@ -28,20 +28,24 @@ struct Opt {
     consistency_level: String,
 
     /// Replication factor
-    #[structopt(long, short = 'r', default_value = "3")]
+    #[structopt(long, short = 'r', default_value = "1")]
     replication_factor: i32,
 
     /// Datacenter
     #[structopt(long, short = 'd', default_value = "datacenter1")]
     datacenter: String,
 
+    /// Number of tablets, if set to 0 tablets are disabled
+    #[structopt(long, short = 't', default_value = "0")]
+    tablets: usize,
+
     /// Number of read threads
     #[structopt(long, default_value = "10")]
-    read_threads: usize,
+    readers: usize,
 
     /// Number of write threads
     #[structopt(long, default_value = "90")]
-    write_threads: usize,
+    writers: usize,
 
     /// Payload type
     #[structopt(long, default_value = "devices")]

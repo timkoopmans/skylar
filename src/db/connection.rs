@@ -59,6 +59,8 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
     .map_err(|e| anyhow!("Error connecting to the database: {}", e))?;
 
     if migrate {
+        let tablets_enabled = if opt.tablets > 0 { "true" } else { "false" };
+        let tablets = opt.tablets.to_string();
         let replication_factor = opt.replication_factor.to_string();
         let schema_query = match opt.payload.as_str() {
             "devices" => DDL_DEVICES,
@@ -67,7 +69,9 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
         }
         .trim()
         .replace('\n', " ")
-        .replace("<RF>", &replication_factor);
+        .replace("<RF>", &replication_factor)
+        .replace("<TABLETS>", &tablets)
+        .replace("<TABLETS_ENABLED>", tablets_enabled);
 
         for q in schema_query.split(';') {
             let query = q.to_owned() + ";";

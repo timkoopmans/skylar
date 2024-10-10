@@ -12,32 +12,26 @@ mod logging;
 #[derive(Debug, Parser, Clone)]
 struct Opt {
     /// Host
-    /// Default value: localhost:9042
     #[structopt(long, default_value = "localhost:9042")]
     host: String,
 
     /// Username
-    /// Default value: cassandra
     #[structopt(long, default_value = "cassandra")]
     username: String,
 
     /// Password
-    /// Default value: cassandra
     #[structopt(long, default_value = "cassandra")]
     password: String,
 
     /// Consistency level
-    /// Default value: LOCAL_QUORUM
     #[structopt(long, short = 'c', default_value = "LOCAL_QUORUM")]
     consistency_level: String,
 
     /// Replication factor
-    /// Default value: 3
     #[structopt(long, short = 'r', default_value = "3")]
     replication_factor: i32,
 
     /// Datacenter
-    /// Default value: datacenter1
     #[structopt(long, short = 'd', default_value = "datacenter1")]
     datacenter: String,
 

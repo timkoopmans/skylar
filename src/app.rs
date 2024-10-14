@@ -10,7 +10,7 @@ use scylla::prepared_statement::PreparedStatement;
 use scylla::{Metrics, Session};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, watch, Mutex};
 use tokio::time;
 use tracing::{debug, error};
 
@@ -207,7 +207,7 @@ impl App {
         session: Arc<Session>,
         opt: &Opt,
     ) -> anyhow::Result<()> {
-        let (tx, mut rx) = mpsc::channel(100);
+        let (tx, rx) = watch::channel(String::new());
 
         let session_clone = session.clone();
         let opt = opt.clone();
@@ -233,7 +233,7 @@ impl App {
                             match next_row_res {
                                 Ok(payload) => {
                                     debug!("{:?}", payload);
-                                    if tx.send(format!("{:?}", payload)).await.is_err() {
+                                    if tx.send(format!("{:?}", payload)).is_err() {
                                         error!("Failed to send row to display task");
                                     }
                                 }
@@ -272,6 +272,7 @@ impl App {
         let session_clone = session.clone();
         let display_task = tokio::spawn(async move {
             let mut terminal = ratatui::init();
+            let mut rx = rx.clone();
 
             loop {
                 let metrics = session_clone.get_metrics();
@@ -280,7 +281,8 @@ impl App {
                     app.update_metrics(&metrics);
                 }
 
-                while let Ok(row) = rx.try_recv() {
+                while (rx.changed().await).is_ok() {
+                    let row = rx.borrow().clone();
                     let mut app = app.lock().await;
                     app.read_logs.push(row);
                     if app.read_logs.len() > 100 {

@@ -4,22 +4,32 @@
 
 A load testing tool for ScyllaDB
 
-    Usage: skylar [OPTIONS]
+```bash
+Usage: skylar [OPTIONS]
 
-    Options:
-          --host <HOST>
-              Host Default value: localhost:9042 [default: localhost:9042]
-      -c, --consistency-level <CONSISTENCY_LEVEL>
-              Consistency level Possible values: ONE, TWO, THREE, QUORUM, ALL, LOCAL_QUORUM, EACH_QUORUM, SERIAL, LOCAL_SERIAL, LOCAL_ONE Default value: LOCAL_QUORUM [default: LOCAL_QUORUM]
-      -r, --replication-factor <REPLICATION_FACTOR>
-              Replication factor Default value: 1 [default: 1]
-      -d, --datacenter <DATACENTER>
-              Datacenter Default value: datacenter1 [default: datacenter1]
-          --read-threads <READ_THREADS>
-              Number of read threads [default: 10]
-          --write-threads <WRITE_THREADS>
-              Number of write threads [default: 90]
-          --payload <PAYLOAD>
-              Payload type [default: devices]
-      -h, --help
-              Print help
+Options:
+      --host <HOST>
+          Host [default: localhost:9042]
+      --username <USERNAME>
+          Username [default: cassandra]
+      --password <PASSWORD>
+          Password [default: cassandra]
+  -c, --consistency-level <CONSISTENCY_LEVEL>
+          Consistency level [default: LOCAL_QUORUM]
+  -r, --replication-factor <REPLICATION_FACTOR>
+          Replication factor [default: 3]
+  -d, --datacenter <DATACENTER>
+          Datacenter [default: datacenter1]
+  -t, --tablets <TABLETS>
+          Number of tablets, if set to 0 tablets are disabled [default: 0]
+  -R, --readers <READERS>
+          Number of read threads [default: 10]
+  -W, --writers <WRITERS>
+          Number of write threads [default: 90]
+  -P, --payload <PAYLOAD>
+          Payload type [default: devices]
+  -D, --distribution <DISTRIBUTION>
+          Distribution sequential, uniform, normal, poisson, geometric, binomial, zipf [default: uniform]
+  -h, --help
+          Print help
+```

@@ -210,19 +210,20 @@ impl App {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         let session_clone = session.clone();
-        let opt = opt.clone();
+        let opt_clone = opt.clone();
         let read_task = tokio::spawn(async move {
-            for _ in 0..opt.readers {
+            for _ in 0..opt_clone.readers {
                 let session = session_clone.clone();
                 let statement: PreparedStatement = session
                     .prepare(R::select_query())
                     .await
                     .expect("Failed to prepare SELECT statement");
                 let tx = tx.clone();
+                let distribution = opt_clone.distribution.clone();
                 tokio::spawn(async move {
                     loop {
                         let statement = statement.clone();
-                        let payload = R::select_values();
+                        let payload = R::select_values(distribution.as_str());
                         let mut rows_stream = session
                             .execute_iter(statement, &payload)
                             .await
@@ -248,17 +249,18 @@ impl App {
         });
 
         let session_clone = session.clone();
-        let opt = opt.clone();
+        let opt_clone = opt.clone();
         let write_task = tokio::spawn(async move {
-            for _ in 0..opt.writers {
+            for _ in 0..opt_clone.writers {
                 let session = session_clone.clone();
                 let statement: PreparedStatement = session
                     .prepare(W::insert_query())
                     .await
                     .expect("Failed to prepare INSERT statement");
+                let distribution = opt_clone.distribution.clone();
                 tokio::spawn(async move {
                     loop {
-                        let payload = W::insert_values();
+                        let payload = W::insert_values(distribution.as_str());
                         if let Err(e) = session.execute_unpaged(&statement, &payload).await {
                             error!("Error inserting payload: {}", e);
                         }

@@ -57,7 +57,7 @@ impl WritePayload for User {
         INSERT_USER
     }
 
-    fn insert_values() -> Self {
+    fn insert_values(distribution: &str) -> Self {
         let mut rng = rand::thread_rng();
         User {
             user_id: Uuid::new_v4(),
@@ -73,7 +73,7 @@ impl ReadPayload for UserValues {
         SELECT_USER
     }
 
-    fn select_values() -> Self {
+    fn select_values(distribution: &str) -> Self {
         UserValues {
             user_id: Uuid::new_v4(),
         }

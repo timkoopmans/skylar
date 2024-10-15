@@ -40,16 +40,21 @@ struct Opt {
     tablets: usize,
 
     /// Number of read threads
-    #[structopt(long, default_value = "10")]
+    #[structopt(long, short = 'R', default_value = "10")]
     readers: usize,
 
     /// Number of write threads
-    #[structopt(long, default_value = "90")]
+    #[structopt(long, short = 'W', default_value = "90")]
     writers: usize,
 
     /// Payload type
-    #[structopt(long, default_value = "devices")]
+    #[structopt(long, short = 'P', default_value = "devices")]
     payload: String,
+
+    /// Distribution
+    /// sequential, uniform, normal, poisson, geometric, binomial, zipf
+    #[structopt(long, short = 'D', default_value = "uniform")]
+    distribution: String,
 }
 
 #[tokio::main]

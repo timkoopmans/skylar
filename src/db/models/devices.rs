@@ -1,11 +1,16 @@
 use crate::db::models::{ReadPayload, WritePayload};
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distributions::Distribution;
+use rand::distributions::{Alphanumeric, DistString, WeightedIndex};
 use rand::prelude::SliceRandom;
 use rand::Rng;
+use rand_distr::{Binomial, Geometric, Normal, Poisson, Zipf};
 use scylla::{FromRow, SerializeRow};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use uuid::Uuid;
+static SEQUENTIAL_INDEX_A: AtomicUsize = AtomicUsize::new(0);
+static SEQUENTIAL_INDEX_B: AtomicUsize = AtomicUsize::new(0);
 
 pub const DDL_DEVICES: &str = r#"
     CREATE KEYSPACE IF NOT EXISTS skylar WITH replication =
@@ -42,14 +47,94 @@ static POOL_SLEDS: Lazy<Vec<Uuid>> = Lazy::new(|| {
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 
-pub fn random_rack_id() -> Uuid {
+pub fn rack_id(distribution: &str) -> Uuid {
     let mut rng = rand::thread_rng();
-    *POOL_RACKS.choose(&mut rng).unwrap()
+    match distribution {
+        "sequential" => {
+            let index = SEQUENTIAL_INDEX_A.fetch_add(1, Ordering::SeqCst) % POOL_RACKS.len();
+            POOL_RACKS[index]
+        }
+        "uniform" => *POOL_RACKS.choose(&mut rng).unwrap(),
+        "weighted" => {
+            let weights = (0..POOL_RACKS.len()).map(|_| 1).collect::<Vec<_>>();
+            let dist = WeightedIndex::new(&weights).unwrap();
+            POOL_RACKS[dist.sample(&mut rng)]
+        }
+        _ => *POOL_RACKS.choose(&mut rng).unwrap(),
+    }
 }
 
-pub fn random_sled_id() -> Uuid {
+pub fn sled_id(distribution: &str) -> Uuid {
     let mut rng = rand::thread_rng();
-    *POOL_SLEDS.choose(&mut rng).unwrap()
+    let weights = match distribution {
+        "sequential" => {
+            let index = SEQUENTIAL_INDEX_B.fetch_add(1, Ordering::SeqCst) % POOL_SLEDS.len();
+            return POOL_SLEDS[index];
+        }
+        "uniform" => return *POOL_SLEDS.choose(&mut rng).unwrap(),
+        "normal" => {
+            let normal = Normal::new(POOL_SLEDS.len() as f64 / 2.0, POOL_SLEDS.len() as f64 / 6.0)
+                .expect("Failed to create normal distribution");
+            let mut weights = vec![0; POOL_SLEDS.len()];
+            for weight in weights.iter_mut() {
+                let sample = normal.sample(&mut rng).round() as usize;
+                if sample < POOL_SLEDS.len() {
+                    *weight += 1;
+                }
+            }
+            weights
+        }
+        "poisson" => {
+            let poisson = Poisson::new(POOL_SLEDS.len() as f64 / 2.0)
+                .expect("Failed to create poisson distribution");
+            let mut weights = vec![0; POOL_SLEDS.len()];
+            for weight in weights.iter_mut() {
+                let sample = poisson.sample(&mut rng) as usize;
+                if sample < POOL_SLEDS.len() {
+                    *weight += 1;
+                }
+            }
+            weights
+        }
+        "binomial" => {
+            let binomial = Binomial::new(20, 0.3).expect("Failed to create binomial distribution");
+            let mut weights = vec![0; POOL_SLEDS.len()];
+            for weight in weights.iter_mut() {
+                let sample = binomial.sample(&mut rng) as usize;
+                if sample < POOL_SLEDS.len() {
+                    *weight += 1;
+                }
+            }
+            weights
+        }
+        "geometric" => {
+            let geometric = Geometric::new(0.3).expect("Failed to create geometric distribution");
+            let mut weights = vec![0; POOL_SLEDS.len()];
+            for weight in weights.iter_mut() {
+                let sample = geometric.sample(&mut rng) as usize;
+                if sample < POOL_SLEDS.len() {
+                    *weight += 1;
+                }
+            }
+            weights
+        }
+        "zipf" => {
+            let zipf = Zipf::new(POOL_SLEDS.len() as u64, 1.5)
+                .expect("Failed to create zipf distribution");
+            let mut weights = vec![0; POOL_SLEDS.len()];
+            for weight in weights.iter_mut() {
+                let sample = zipf.sample(&mut rng) as usize;
+                if sample < POOL_SLEDS.len() {
+                    *weight += 1;
+                }
+            }
+            weights
+        }
+        _ => (0..POOL_SLEDS.len()).map(|_| 1).collect(),
+    };
+
+    let dist = WeightedIndex::new(&weights).unwrap();
+    POOL_SLEDS[dist.sample(&mut rng)]
 }
 
 pub const INSERT_DEVICE: &str = "
@@ -120,15 +205,15 @@ impl WritePayload for Device {
         INSERT_DEVICE
     }
 
-    fn insert_values() -> Self {
+    fn insert_values(distribution: &str) -> Self {
         let mut rng = rand::thread_rng();
         let now = Utc::now();
         let string = Alphanumeric.sample_string(&mut rand::thread_rng(), 4);
         Device {
             kind: "vnic".to_string(),
             link_name: format!("l-{}", string),
-            rack_id: random_rack_id(),
-            sled_id: random_sled_id(),
+            rack_id: rack_id(distribution),
+            sled_id: sled_id(distribution),
             sled_model: format!("m-{}", string),
             sled_revision: rng.gen_range(0..10),
             sled_serial: format!("s-{}", string),
@@ -147,11 +232,11 @@ impl ReadPayload for DeviceValues {
         SELECT_DEVICE
     }
 
-    fn select_values() -> Self {
+    fn select_values(distribution: &str) -> Self {
         let time = Utc::now() - chrono::Duration::seconds(5);
         DeviceValues {
-            rack_id: random_rack_id(),
-            sled_id: random_sled_id(),
+            rack_id: rack_id(distribution),
+            sled_id: sled_id(distribution),
             time,
         }
     }

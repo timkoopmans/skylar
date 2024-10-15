@@ -14,7 +14,7 @@ use std::time::Duration;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use tokio::sync::{mpsc, Mutex};
-use tokio::{signal, time};
+use tokio::time;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 

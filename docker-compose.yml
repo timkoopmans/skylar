@@ -10,5 +10,12 @@ services:
     mem_limit: 4G
     command: --smp 1
 
+  skylar:
+    build: .
+    image: scylladb/skylar
+    ports:
+      - 8000:8000
+    environment:
+      - DATABASE_URL=scylla:9042
 volumes:
   scylla_data:

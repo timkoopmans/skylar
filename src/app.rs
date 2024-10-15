@@ -194,7 +194,7 @@ impl App {
             .map(|i| ListItem::new(i.as_str()))
             .collect();
         let read_logs_list = List::new(items)
-            .block(Block::default().title("Read Log").borders(Borders::ALL))
+            .block(Block::default().title("Read Samples").borders(Borders::ALL))
             .style(Style::default().fg(Color::White));
         frame.render_widget(read_logs_list, chunks[6]);
     }
@@ -207,7 +207,7 @@ impl App {
         session: Arc<Session>,
         opt: &Opt,
     ) -> anyhow::Result<()> {
-        let (tx, mut rx) = mpsc::channel(100);
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
         let session_clone = session.clone();
         let opt = opt.clone();
@@ -233,7 +233,7 @@ impl App {
                             match next_row_res {
                                 Ok(payload) => {
                                     debug!("{:?}", payload);
-                                    if tx.send(format!("{:?}", payload)).await.is_err() {
+                                    if tx.send(format!("{:?}", payload)).is_err() {
                                         error!("Failed to send row to display task");
                                     }
                                 }
@@ -283,7 +283,7 @@ impl App {
                 while let Ok(row) = rx.try_recv() {
                     let mut app = app.lock().await;
                     app.read_logs.push(row);
-                    if app.read_logs.len() > 100 {
+                    if app.read_logs.len() > 7 {
                         app.read_logs.remove(0);
                     }
                 }

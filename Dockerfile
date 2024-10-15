@@ -16,6 +16,5 @@ FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt install -y openssl
 
 COPY --from=builder /app/target/release/skylar /app/skylar
-COPY --from=builder /app/public /app/public
 
 CMD ["/app/skylar"]

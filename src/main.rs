@@ -67,19 +67,14 @@ async fn main() -> Result<()> {
 
     let mut app = App::new();
 
-    match opt.payload.as_str() {
+    let result = match opt.payload.as_str() {
         "devices" => {
-            let display = app
-                .run::<Device, DeviceValues>(Arc::from(session), &opt)
-                .await;
-            ratatui::restore();
-            display
+            app.run::<Device, DeviceValues>(Arc::from(session), &opt)
+                .await
         }
-        "users" => {
-            let display = app.run::<User, UserValues>(Arc::from(session), &opt).await;
-            ratatui::restore();
-            display
-        }
+        "users" => app.run::<User, UserValues>(Arc::from(session), &opt).await,
         _ => panic!("Unsupported payload type"),
-    }
+    };
+
+    result
 }

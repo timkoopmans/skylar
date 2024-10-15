@@ -1344,6 +1344,7 @@ dependencies = [
  "scylla",
  "serde",
  "serde_json",
+ "strum",
  "thiserror",
  "tokio",
  "tokio-retry",

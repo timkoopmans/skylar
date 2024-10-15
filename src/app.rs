@@ -1,15 +1,17 @@
 use crate::db::models::{ReadPayload, WritePayload};
 use crate::Opt;
 use futures::StreamExt;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::prelude::{Color, Style};
-use ratatui::widgets::{Block, Borders, Sparkline};
-use ratatui::widgets::{List, ListItem};
+use ratatui::crossterm::event;
+use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Block, Borders, List, ListItem, Sparkline, Tabs};
 use ratatui::Frame;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::{Metrics, Session};
 use std::sync::Arc;
 use std::time::Duration;
+use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
 use tracing::{debug, error};
@@ -27,6 +29,24 @@ pub struct App {
     errors_num_prev: u64,
     errors_iter_num_prev: u64,
     read_logs: Vec<String>,
+    selected_tab: SelectedTab,
+    state: AppState,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum AppState {
+    #[default]
+    Running,
+    Quitting,
+}
+
+#[derive(Default, Clone, Copy, Display, FromRepr, EnumIter)]
+enum SelectedTab {
+    #[default]
+    #[strum(to_string = "Metrics")]
+    Metrics,
+    #[strum(to_string = "Read Samples")]
+    ReadSamples,
 }
 
 impl App {
@@ -43,6 +63,8 @@ impl App {
             errors_num_prev: 0,
             errors_iter_num_prev: 0,
             read_logs: vec![],
+            selected_tab: SelectedTab::Metrics,
+            state: AppState::Running,
         }
     }
 
@@ -90,19 +112,42 @@ impl App {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
+            .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
+            .split(frame.area());
+
+        self.render_tabs(chunks[0], frame);
+        match self.selected_tab {
+            SelectedTab::Metrics => self.draw_metrics(frame, chunks[1]),
+            SelectedTab::ReadSamples => self.draw_read_samples(frame, chunks[1]),
+        }
+    }
+
+    fn render_tabs(&self, area: Rect, frame: &mut Frame) {
+        let titles = SelectedTab::iter()
+            .map(|tab| tab.to_string())
+            .collect::<Vec<_>>();
+        let tabs = Tabs::new(titles)
+            .select(self.selected_tab as usize)
+            .block(Block::default().borders(Borders::NONE))
+            .highlight_style(Style::default().fg(Color::LightBlue));
+        frame.render_widget(tabs, area);
+    }
+
+    fn draw_metrics(&self, frame: &mut Frame, area: Rect) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
             .constraints(
                 [
                     Constraint::Percentage(14),
                     Constraint::Percentage(14),
                     Constraint::Percentage(14),
                     Constraint::Percentage(14),
-                    Constraint::Percentage(10),
-                    Constraint::Percentage(10),
-                    Constraint::Percentage(24),
+                    Constraint::Percentage(14),
+                    Constraint::Percentage(14),
                 ]
                 .as_ref(),
             )
-            .split(frame.area());
+            .split(area);
 
         let latency_avg_ms_title = format!(
             "Average Latency ({}ms)",
@@ -187,7 +232,9 @@ impl App {
             .data(&self.errors_iter_num)
             .style(Style::default().fg(Color::Yellow));
         frame.render_widget(errors_iter_num_sparkline, chunks[5]);
+    }
 
+    fn draw_read_samples(&self, frame: &mut Frame, area: Rect) {
         let items: Vec<ListItem> = self
             .read_logs
             .iter()
@@ -196,7 +243,7 @@ impl App {
         let read_logs_list = List::new(items)
             .block(Block::default().title("Read Samples").borders(Borders::ALL))
             .style(Style::default().fg(Color::White));
-        frame.render_widget(read_logs_list, chunks[6]);
+        frame.render_widget(read_logs_list, area);
     }
 
     pub async fn run<
@@ -235,7 +282,8 @@ impl App {
                                 Ok(payload) => {
                                     debug!("{:?}", payload);
                                     if tx.send(format!("{:?}", payload)).is_err() {
-                                        error!("Failed to send row to display task");
+                                        debug!("Failed to send row to display task");
+                                        break;
                                     }
                                 }
                                 Err(e) => {
@@ -285,14 +333,24 @@ impl App {
                 while let Ok(row) = rx.try_recv() {
                     let mut app = app.lock().await;
                     app.read_logs.push(row);
-                    if app.read_logs.len() > 7 {
+                    if app.read_logs.len() > 100 {
                         app.read_logs.remove(0);
                     }
                 }
 
-                let app = app.lock().await;
+                let mut app = app.lock().await;
                 if let Err(e) = terminal.draw(|frame| app.draw(frame)) {
                     error!("Error drawing frame: {}", e);
+                }
+
+                {
+                    if let Err(e) = app.handle_events() {
+                        error!("Error handling events: {}", e);
+                    }
+                }
+
+                if app.state == AppState::Quitting {
+                    break;
                 }
 
                 time::sleep(Duration::from_secs(1)).await;
@@ -301,8 +359,48 @@ impl App {
 
         tokio::try_join!(read_task, write_task, display_task)?;
 
-        loop {
-            time::sleep(Duration::from_secs(60)).await;
+        Ok(())
+    }
+
+    fn handle_events(&mut self) -> std::io::Result<()> {
+        if event::poll(Duration::from_millis(0))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
+                        KeyCode::Char('h') | KeyCode::Left => self.previous_tab(),
+                        KeyCode::Char('q') | KeyCode::Esc => self.quit(),
+                        _ => {}
+                    }
+                }
+            }
         }
+        Ok(())
+    }
+
+    pub fn next_tab(&mut self) {
+        self.selected_tab = self.selected_tab.next();
+    }
+
+    pub fn previous_tab(&mut self) {
+        self.selected_tab = self.selected_tab.previous();
+    }
+
+    pub fn quit(&mut self) {
+        self.state = AppState::Quitting;
+    }
+}
+
+impl SelectedTab {
+    fn previous(self) -> Self {
+        let current_index: usize = self as usize;
+        let previous_index = current_index.saturating_sub(1);
+        Self::from_repr(previous_index).unwrap_or(self)
+    }
+
+    fn next(self) -> Self {
+        let current_index = self as usize;
+        let next_index = current_index.saturating_add(1);
+        Self::from_repr(next_index).unwrap_or(self)
     }
 }

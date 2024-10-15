@@ -5,13 +5,14 @@ use ratatui::crossterm::event;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::widgets::{Block, Borders, List, ListItem, Sparkline, Tabs};
+use ratatui::widgets::{Block, Borders, Gauge, List, ListItem, Sparkline, Tabs};
 use ratatui::Frame;
 use scylla::prepared_statement::PreparedStatement;
 use scylla::{Metrics, Session};
 use std::sync::Arc;
 use std::time::Duration;
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
+use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
 use tracing::{debug, error};
@@ -29,8 +30,11 @@ pub struct App {
     errors_num_prev: u64,
     errors_iter_num_prev: u64,
     read_logs: Vec<String>,
+    cpu_usage: f32,
+    memory_usage: f32,
     selected_tab: SelectedTab,
     state: AppState,
+    system: Arc<std::sync::Mutex<System>>,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
@@ -43,14 +47,21 @@ enum AppState {
 #[derive(Default, Clone, Copy, Display, FromRepr, EnumIter)]
 enum SelectedTab {
     #[default]
-    #[strum(to_string = "Metrics")]
+    #[strum(to_string = "METRICS")]
     Metrics,
-    #[strum(to_string = "Read Samples")]
-    ReadSamples,
+    #[strum(to_string = "SAMPLES")]
+    Samples,
+    #[strum(to_string = "SYSTEM")]
+    System,
 }
 
 impl App {
     pub(crate) fn new() -> Self {
+        let system = Arc::new(std::sync::Mutex::new(System::new_with_specifics(
+            RefreshKind::new()
+                .with_cpu(CpuRefreshKind::new())
+                .with_memory(MemoryRefreshKind::new()),
+        )));
         Self {
             queries_num: vec![],
             queries_iter_num: vec![],
@@ -63,9 +74,39 @@ impl App {
             errors_num_prev: 0,
             errors_iter_num_prev: 0,
             read_logs: vec![],
+            cpu_usage: 0.0,
+            memory_usage: 0.0,
             selected_tab: SelectedTab::Metrics,
             state: AppState::Running,
+            system,
         }
+    }
+
+    fn update_system_info(&mut self) {
+        let mut system = self.system.lock().unwrap();
+        system.refresh_cpu_all();
+        system.refresh_memory();
+        self.cpu_usage = system.global_cpu_usage();
+        self.memory_usage = system.used_memory() as f32 / system.total_memory() as f32 * 100.0;
+    }
+
+    fn render_system(&self, frame: &mut Frame, area: Rect) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .split(area);
+
+        let cpu_gauge = Gauge::default()
+            .block(Block::default().title("CPU").borders(Borders::ALL))
+            .gauge_style(Style::default().fg(Color::Blue))
+            .percent(self.cpu_usage as u16);
+        frame.render_widget(cpu_gauge, chunks[0]);
+
+        let memory_gauge = Gauge::default()
+            .block(Block::default().title("MEM").borders(Borders::ALL))
+            .gauge_style(Style::default().fg(Color::LightBlue))
+            .percent(self.memory_usage as u16);
+        frame.render_widget(memory_gauge, chunks[1]);
     }
 
     fn update_metrics(&mut self, metrics: &Metrics) {
@@ -118,7 +159,8 @@ impl App {
         self.render_tabs(chunks[0], frame);
         match self.selected_tab {
             SelectedTab::Metrics => self.draw_metrics(frame, chunks[1]),
-            SelectedTab::ReadSamples => self.draw_read_samples(frame, chunks[1]),
+            SelectedTab::Samples => self.draw_read_samples(frame, chunks[1]),
+            SelectedTab::System => self.render_system(frame, chunks[1]),
         }
     }
 
@@ -138,12 +180,12 @@ impl App {
             .direction(Direction::Vertical)
             .constraints(
                 [
-                    Constraint::Percentage(14),
-                    Constraint::Percentage(14),
-                    Constraint::Percentage(14),
-                    Constraint::Percentage(14),
-                    Constraint::Percentage(14),
-                    Constraint::Percentage(14),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
                 ]
                 .as_ref(),
             )
@@ -160,7 +202,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .data(&self.latency_avg_ms)
-            .style(Style::default().fg(Color::Magenta));
+            .style(Style::default().fg(Color::Blue));
         frame.render_widget(latency_avg_ms_sparkline, chunks[0]);
 
         let latency_percentile_ms_title = format!(
@@ -174,7 +216,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .data(&self.latency_percentile_ms)
-            .style(Style::default().fg(Color::Cyan));
+            .style(Style::default().fg(Color::LightBlue));
         frame.render_widget(latency_percentile_ms_sparkline, chunks[1]);
 
         let queries_num_title = format!(
@@ -188,7 +230,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .data(&self.queries_num)
-            .style(Style::default().fg(Color::LightBlue));
+            .style(Style::default().fg(Color::Green));
         frame.render_widget(queries_num_sparkline, chunks[2]);
 
         let queries_iter_num_title = format!(
@@ -202,7 +244,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .data(&self.queries_iter_num)
-            .style(Style::default().fg(Color::Green));
+            .style(Style::default().fg(Color::LightGreen));
         frame.render_widget(queries_iter_num_sparkline, chunks[3]);
 
         let errors_num_title = format!(
@@ -230,7 +272,7 @@ impl App {
                     .borders(Borders::ALL),
             )
             .data(&self.errors_iter_num)
-            .style(Style::default().fg(Color::Yellow));
+            .style(Style::default().fg(Color::LightRed));
         frame.render_widget(errors_iter_num_sparkline, chunks[5]);
     }
 
@@ -328,6 +370,7 @@ impl App {
                 {
                     let mut app = app.lock().await;
                     app.update_metrics(&metrics);
+                    app.update_system_info();
                 }
 
                 while let Ok(row) = rx.try_recv() {

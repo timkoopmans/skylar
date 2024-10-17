@@ -39,11 +39,11 @@ struct Opt {
     tablets: usize,
 
     /// Number of read threads
-    #[structopt(long, short = 'R', default_value = "10")]
+    #[structopt(long, short = 'R', default_value = "50")]
     readers: usize,
 
     /// Number of write threads
-    #[structopt(long, short = 'W', default_value = "90")]
+    #[structopt(long, short = 'W', default_value = "50")]
     writers: usize,
 
     /// Payload type

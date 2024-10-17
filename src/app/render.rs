@@ -87,32 +87,32 @@ impl App {
         self.render_sparkline(
             frame,
             chunks[2],
-            "Queries",
-            "req/s",
+            "Writes",
+            "ops/s",
             &self.queries_num,
             Color::Green,
         );
         self.render_sparkline(
             frame,
             chunks[3],
-            "Iter Queries",
-            "req/s",
+            "Reads",
+            "ops/s",
             &self.queries_iter_num,
             Color::LightGreen,
         );
         self.render_sparkline(
             frame,
             chunks[4],
-            "Errors",
-            "/s",
+            "Write Errors",
+            "ops/s",
             &self.errors_num,
             Color::Red,
         );
         self.render_sparkline(
             frame,
             chunks[5],
-            "Iter Errors",
-            "/s",
+            "Read Errors",
+            "ops/s",
             &self.errors_iter_num,
             Color::LightRed,
         );

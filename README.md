@@ -1,7 +1,6 @@
 # Skylar
 
 ![img.png](img.png)
-
 A load testing tool for ScyllaDB
 
 ```bash

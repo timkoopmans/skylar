@@ -1,4 +1,5 @@
 mod events;
+pub mod logging;
 mod metrics;
 mod render;
 mod state;

@@ -1,13 +1,12 @@
 use crate::db::models::devices::{Device, DeviceValues};
 use crate::db::models::users::{User, UserValues};
 use anyhow::Result;
-use app::App;
+use app::{logging, App};
 use clap::Parser;
 use std::sync::Arc;
 
 mod app;
 mod db;
-mod logging;
 
 #[derive(Debug, Parser, Clone)]
 struct Opt {

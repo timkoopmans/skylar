@@ -35,7 +35,7 @@ struct Opt {
     datacenter: String,
 
     /// Number of tablets, if set to 0 tablets are disabled
-    #[structopt(long, short = 't', default_value = "0")]
+    #[structopt(long, short = 't', default_value = "3000")]
     tablets: usize,
 
     /// Number of read threads

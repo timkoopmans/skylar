@@ -47,7 +47,7 @@ struct Opt {
     writers: usize,
 
     /// Payload type
-    #[structopt(long, short = 'P', default_value = "uniform")]
+    #[structopt(long, short = 'P', default_value = "devices")]
     payload: String,
 
     /// Distribution

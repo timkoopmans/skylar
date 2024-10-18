@@ -1,6 +1,6 @@
 services:
   scylladb:
-    image: scylladb/scylla:6.1.1
+    image: scylladb/scylla:6.1.2
     volumes:
       - scylla_data:/var/lib/scylla
     shm_size: 4g
@@ -13,9 +13,7 @@ services:
 
   skylar:
     build: .
-    image: scylladb/skylar
-    environment:
-      - DATABASE_URL=scylla:9042
-      
+    image: timkoopmans/skylar
+
 volumes:
   scylla_data:

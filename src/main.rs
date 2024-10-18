@@ -57,14 +57,14 @@ struct Opt {
     /// The uniform distribution U(min, max).
     /// normal:
     /// The normal distribution N(mean, std_dev**2).
-    /// This uses the ZIGNOR variant of the Ziggurat method, see StandardNormal for more details.
     /// Note that StandardNormal is an optimised implementation for mean 0, and standard deviation 1.
     /// poisson:
     /// The Poisson distribution Poisson(lambda).
     /// This distribution has a density function: f(k) = lambda^k * exp(-lambda) / k! for k >= 0.
     /// geometric:
     /// The geometric distribution Geometric(p) bounded to [0, u64::MAX].
-    /// This is the probability distribution of the number of failures before the first success in a series of Bernoulli trials. It has the density function f(k) = (1 - p)^k p for k >= 0, where p is the probability of success on each trial.
+    /// This is the probability distribution of the number of failures before the first success in a series of Bernoulli trials.
+    /// It has the density function f(k) = (1 - p)^k p for k >= 0, where p is the probability of success on each trial.
     /// binomial:
     /// The binomial distribution Binomial(n, p).
     /// This distribution has density function: f(k) = n!/(k! (n-k)!) p^k (1-p)^(n-k) for k >= 0.

@@ -47,6 +47,73 @@ static POOL_SLEDS: Lazy<Vec<Uuid>> = Lazy::new(|| {
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 
+static WEIGHTS_NORMAL: Lazy<WeightedIndex<usize>> = Lazy::new(|| {
+    let mut rng = rand::thread_rng();
+    let normal = Normal::new(POOL_SLEDS.len() as f64 / 2.0, POOL_SLEDS.len() as f64 / 6.0)
+        .expect("Failed to create normal distribution");
+    let mut weights = vec![0; POOL_SLEDS.len()];
+    for weight in weights.iter_mut() {
+        let sample = normal.sample(&mut rng).round() as usize;
+        if sample < POOL_SLEDS.len() {
+            *weight += 1;
+        }
+    }
+    WeightedIndex::new(weights).unwrap()
+});
+
+static WEIGHTS_POISSON: Lazy<WeightedIndex<usize>> = Lazy::new(|| {
+    let mut rng = rand::thread_rng();
+    let poisson =
+        Poisson::new(POOL_SLEDS.len() as f64 / 2.0).expect("Failed to create poisson distribution");
+    let mut weights = vec![0; POOL_SLEDS.len()];
+    for weight in weights.iter_mut() {
+        let sample = poisson.sample(&mut rng) as usize;
+        if sample < POOL_SLEDS.len() {
+            *weight += 1;
+        }
+    }
+    WeightedIndex::new(weights).unwrap()
+});
+
+static WEIGHTS_BINOMIAL: Lazy<WeightedIndex<usize>> = Lazy::new(|| {
+    let mut rng = rand::thread_rng();
+    let binomial = Binomial::new(20, 0.3).expect("Failed to create binomial distribution");
+    let mut weights = vec![0; POOL_SLEDS.len()];
+    for weight in weights.iter_mut() {
+        let sample = binomial.sample(&mut rng) as usize;
+        if sample < POOL_SLEDS.len() {
+            *weight += 1;
+        }
+    }
+    WeightedIndex::new(weights).unwrap()
+});
+
+static WEIGHTS_GEOMETRIC: Lazy<WeightedIndex<usize>> = Lazy::new(|| {
+    let mut rng = rand::thread_rng();
+    let geometric = Geometric::new(0.3).expect("Failed to create geometric distribution");
+    let mut weights = vec![0; POOL_SLEDS.len()];
+    for weight in weights.iter_mut() {
+        let sample = geometric.sample(&mut rng) as usize;
+        if sample < POOL_SLEDS.len() {
+            *weight += 1;
+        }
+    }
+    WeightedIndex::new(weights).unwrap()
+});
+
+static WEIGHTS_ZIPF: Lazy<WeightedIndex<usize>> = Lazy::new(|| {
+    let mut rng = rand::thread_rng();
+    let zipf = Zipf::new(POOL_SLEDS.len() as u64, 1.5).expect("Failed to create zipf distribution");
+    let mut weights = vec![0; POOL_SLEDS.len()];
+    for weight in weights.iter_mut() {
+        let sample = zipf.sample(&mut rng) as usize;
+        if sample < POOL_SLEDS.len() {
+            *weight += 1;
+        }
+    }
+    WeightedIndex::new(weights).unwrap()
+});
+
 pub fn rack_id(distribution: &str) -> Uuid {
     let mut rng = rand::thread_rng();
     match distribution {
@@ -54,86 +121,26 @@ pub fn rack_id(distribution: &str) -> Uuid {
             let index = SEQUENTIAL_INDEX_A.fetch_add(1, Ordering::SeqCst) % POOL_RACKS.len();
             POOL_RACKS[index]
         }
-        "uniform" => *POOL_RACKS.choose(&mut rng).unwrap(),
-        "weighted" => {
-            let weights = (0..POOL_RACKS.len()).map(|_| 1).collect::<Vec<_>>();
-            let dist = WeightedIndex::new(&weights).unwrap();
-            POOL_RACKS[dist.sample(&mut rng)]
-        }
         _ => *POOL_RACKS.choose(&mut rng).unwrap(),
     }
 }
 
 pub fn sled_id(distribution: &str) -> Uuid {
     let mut rng = rand::thread_rng();
-    let weights = match distribution {
+    let dist = match distribution {
         "sequential" => {
             let index = SEQUENTIAL_INDEX_B.fetch_add(1, Ordering::SeqCst) % POOL_SLEDS.len();
             return POOL_SLEDS[index];
         }
         "uniform" => return *POOL_SLEDS.choose(&mut rng).unwrap(),
-        "normal" => {
-            let normal = Normal::new(POOL_SLEDS.len() as f64 / 2.0, POOL_SLEDS.len() as f64 / 6.0)
-                .expect("Failed to create normal distribution");
-            let mut weights = vec![0; POOL_SLEDS.len()];
-            for weight in weights.iter_mut() {
-                let sample = normal.sample(&mut rng).round() as usize;
-                if sample < POOL_SLEDS.len() {
-                    *weight += 1;
-                }
-            }
-            weights
-        }
-        "poisson" => {
-            let poisson = Poisson::new(POOL_SLEDS.len() as f64 / 2.0)
-                .expect("Failed to create poisson distribution");
-            let mut weights = vec![0; POOL_SLEDS.len()];
-            for weight in weights.iter_mut() {
-                let sample = poisson.sample(&mut rng) as usize;
-                if sample < POOL_SLEDS.len() {
-                    *weight += 1;
-                }
-            }
-            weights
-        }
-        "binomial" => {
-            let binomial = Binomial::new(20, 0.3).expect("Failed to create binomial distribution");
-            let mut weights = vec![0; POOL_SLEDS.len()];
-            for weight in weights.iter_mut() {
-                let sample = binomial.sample(&mut rng) as usize;
-                if sample < POOL_SLEDS.len() {
-                    *weight += 1;
-                }
-            }
-            weights
-        }
-        "geometric" => {
-            let geometric = Geometric::new(0.3).expect("Failed to create geometric distribution");
-            let mut weights = vec![0; POOL_SLEDS.len()];
-            for weight in weights.iter_mut() {
-                let sample = geometric.sample(&mut rng) as usize;
-                if sample < POOL_SLEDS.len() {
-                    *weight += 1;
-                }
-            }
-            weights
-        }
-        "zipf" => {
-            let zipf = Zipf::new(POOL_SLEDS.len() as u64, 1.5)
-                .expect("Failed to create zipf distribution");
-            let mut weights = vec![0; POOL_SLEDS.len()];
-            for weight in weights.iter_mut() {
-                let sample = zipf.sample(&mut rng) as usize;
-                if sample < POOL_SLEDS.len() {
-                    *weight += 1;
-                }
-            }
-            weights
-        }
-        _ => (0..POOL_SLEDS.len()).map(|_| 1).collect(),
+        "normal" => &WEIGHTS_NORMAL,
+        "poisson" => &WEIGHTS_POISSON,
+        "binomial" => &WEIGHTS_BINOMIAL,
+        "geometric" => &WEIGHTS_GEOMETRIC,
+        "zipf" => &WEIGHTS_ZIPF,
+        _ => return *POOL_SLEDS.choose(&mut rng).unwrap(),
     };
 
-    let dist = WeightedIndex::new(&weights).unwrap();
     POOL_SLEDS[dist.sample(&mut rng)]
 }
 

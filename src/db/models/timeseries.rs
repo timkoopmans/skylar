@@ -12,7 +12,7 @@ use uuid::Uuid;
 static SEQUENTIAL_INDEX_A: AtomicUsize = AtomicUsize::new(0);
 static SEQUENTIAL_INDEX_B: AtomicUsize = AtomicUsize::new(0);
 
-pub const DDL_DEVICES: &str = r#"
+pub const DDL_TIMESERIES: &str = r#"
     CREATE KEYSPACE IF NOT EXISTS skylar WITH replication =
     {'class': 'NetworkTopologyStrategy', 'replication_factor': <RF>}
     AND tablets = {'enabled': <TABLETS_ENABLED>, 'initial': <TABLETS>};

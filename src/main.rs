@@ -1,5 +1,5 @@
-use crate::db::models::devices::{Device, DeviceValues};
-use crate::db::models::users::{User, UserValues};
+use crate::db::models::timeseries::{Device, DeviceValues};
+use crate::db::models::cache::{Cache, CacheValues};
 use anyhow::Result;
 use app::{logging, App};
 use clap::Parser;
@@ -47,7 +47,7 @@ struct Opt {
     writers: usize,
 
     /// Payload type
-    #[structopt(long, short = 'P', default_value = "devices")]
+    #[structopt(long, short = 'P', default_value = "timeseries")]
     payload: String,
 
     /// Distribution
@@ -88,11 +88,11 @@ async fn main() -> Result<()> {
     let mut app = App::new();
 
     let result = match opt.payload.as_str() {
-        "devices" => {
+        "timeseries" => {
             app.run::<Device, DeviceValues>(Arc::from(session), &opt)
                 .await
         }
-        "users" => app.run::<User, UserValues>(Arc::from(session), &opt).await,
+        "cache" => app.run::<Cache, CacheValues>(Arc::from(session), &opt).await,
         _ => panic!("Unsupported payload type"),
     };
 

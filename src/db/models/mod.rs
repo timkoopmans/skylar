@@ -1,5 +1,5 @@
-pub mod devices;
-pub mod users;
+pub mod timeseries;
+pub mod cache;
 
 pub trait WritePayload: Send + Sync + 'static {
     fn insert_query() -> &'static str;

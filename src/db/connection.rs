@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use crate::db::models::timeseries::DDL_TIMESERIES;
 use crate::db::models::cache::DDL_CACHE;
+use crate::db::models::timeseries::DDL_TIMESERIES;
 use crate::Opt;
 use anyhow::{anyhow, Result};
 use scylla::load_balancing::DefaultPolicy;
@@ -63,7 +63,7 @@ pub async fn builder(migrate: bool, opt: &Opt) -> Result<Session> {
         let tablets = opt.tablets.to_string();
         let replication_factor = opt.replication_factor.to_string();
         let schema_query = match opt.payload.as_str() {
-            "devices" => DDL_TIMESERIES,
+            "timeseries" => DDL_TIMESERIES,
             "cache" => DDL_CACHE,
             _ => panic!("Unsupported payload type"),
         }

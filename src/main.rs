@@ -1,5 +1,5 @@
-use crate::db::models::timeseries::{Device, DeviceValues};
 use crate::db::models::cache::{Cache, CacheValues};
+use crate::db::models::timeseries::{Device, DeviceValues};
 use anyhow::Result;
 use app::{logging, App};
 use clap::Parser;
@@ -75,6 +75,21 @@ struct Opt {
     /// (with exponent `s`).
     #[structopt(long, short = 'D', default_value = "uniform")]
     distribution: String,
+
+    /// Rate Min
+    /// The min rate at which to insert/read data in iterations per second.
+    #[structopt(long, default_value = "10")]
+    rate_min: u64,
+
+    /// Rate Max
+    /// The max rate at which to insert/read data in iterations per second.
+    #[structopt(long, default_value = "100")]
+    rate_max: u64,
+
+    /// Rate Period
+    /// The period over which to increase the rate from rate_min to rate_max.
+    #[structopt(long, default_value = "20")]
+    rate_period: u64,
 }
 
 #[tokio::main]
@@ -92,7 +107,10 @@ async fn main() -> Result<()> {
             app.run::<Device, DeviceValues>(Arc::from(session), &opt)
                 .await
         }
-        "cache" => app.run::<Cache, CacheValues>(Arc::from(session), &opt).await,
+        "cache" => {
+            app.run::<Cache, CacheValues>(Arc::from(session), &opt)
+                .await
+        }
         _ => panic!("Unsupported payload type"),
     };
 

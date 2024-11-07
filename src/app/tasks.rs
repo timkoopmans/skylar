@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
+use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
@@ -35,7 +36,9 @@ impl App {
                 let distribution = opt.distribution.clone();
                 let cancellation_token = cancellation_token.clone();
                 tokio::spawn(async move {
+                    let start_time = Instant::now();
                     loop {
+                        let start = Instant::now();
                         let statement = statement.clone();
                         let payload = R::select_values(distribution.as_str());
                         let mut rows_stream = session
@@ -62,6 +65,21 @@ impl App {
                         if cancellation_token.is_cancelled() {
                             break;
                         }
+
+                        let elapsed = start_time.elapsed().as_secs_f64();
+
+                        let pacing = Self::calculate_pacing(
+                            opt.readers as f64,
+                            opt.rate_min as f64,
+                            opt.rate_max as f64,
+                            opt.rate_period as f64,
+                            elapsed,
+                        );
+
+                        let elapsed = start.elapsed();
+                        if pacing > elapsed {
+                            time::sleep(pacing - elapsed).await;
+                        }
                     }
                 });
             }
@@ -87,7 +105,10 @@ impl App {
                 let distribution = opt.distribution.clone();
                 let cancellation_token = cancellation_token.clone();
                 tokio::spawn(async move {
+                    let start_time = Instant::now();
                     loop {
+                        let start = Instant::now();
+
                         let payload = W::insert_values(distribution.as_str());
                         if let Err(e) = session.execute_unpaged(&statement, &payload).await {
                             error!("Error inserting payload: {}", e);
@@ -95,6 +116,21 @@ impl App {
 
                         if cancellation_token.is_cancelled() {
                             break;
+                        }
+
+                        let elapsed = start_time.elapsed().as_secs_f64();
+
+                        let pacing = Self::calculate_pacing(
+                            opt.writers as f64,
+                            opt.rate_min as f64,
+                            opt.rate_max as f64,
+                            opt.rate_period as f64,
+                            elapsed,
+                        );
+
+                        let elapsed = start.elapsed();
+                        if pacing > elapsed {
+                            time::sleep(pacing - elapsed).await;
                         }
                     }
                 });
@@ -149,5 +185,41 @@ impl App {
             terminal.clear().expect("Failed to clear terminal");
             terminal.show_cursor().expect("Failed to show cursor");
         })
+    }
+
+    fn calculate_pacing(
+        threads: f64,
+        rate_min: f64,
+        rate_max: f64,
+        rate_period: f64,
+        elapsed: f64,
+    ) -> Duration {
+        let quarter_period = rate_period / 4.0;
+        let rate_min = rate_min / threads;
+        let rate_max = rate_max / threads;
+        let rate = if rate_min > 0. && rate_max > 0. {
+            let t = elapsed % rate_period;
+            if t < quarter_period {
+                // Rise
+                rate_min + (rate_max - rate_min) * (t / quarter_period)
+            } else if t < 2.0 * quarter_period {
+                // Peak
+                rate_max
+            } else if t < 3.0 * quarter_period {
+                // Fall
+                rate_max - (rate_max - rate_min) * ((t - 2.0 * quarter_period) / quarter_period)
+            } else {
+                // Trough
+                rate_min
+            }
+        } else {
+            rate_max
+        };
+
+        if rate > 0.0 {
+            Duration::from_millis((1000.0 / rate).max(1.0) as u64)
+        } else {
+            Duration::from_millis(0)
+        }
     }
 }

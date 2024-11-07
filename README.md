@@ -28,7 +28,14 @@ Options:
   -P, --payload <PAYLOAD>
           Payload type [default: devices]
   -D, --distribution <DISTRIBUTION>
-          Distribution sequential, uniform, normal, poisson, geometric, binomial, zipf [default: uniform]
+          Distribution sequential, uniform, normal, poisson, geometric, binomial, zipf [default: uniform]      
+      --rate-min <RATE_MIN>
+          Rate Min The min rate at which to insert/read data in iterations per second [default: 0]
+      --rate-max <RATE_MAX>
+          Rate Max The max rate at which to insert/read data in iterations per second [default: 0]
+      --rate-period <RATE_PERIOD>
+          Rate Period The period over which to increase the rate from rate_min to rate_max [default: 0]
+    
   -h, --help
           Print help
 ```

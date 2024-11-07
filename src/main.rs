@@ -78,17 +78,17 @@ struct Opt {
 
     /// Rate Min
     /// The min rate at which to insert/read data in iterations per second.
-    #[structopt(long, default_value = "10")]
+    #[structopt(long, default_value = "0")]
     rate_min: u64,
 
     /// Rate Max
     /// The max rate at which to insert/read data in iterations per second.
-    #[structopt(long, default_value = "100")]
+    #[structopt(long, default_value = "0")]
     rate_max: u64,
 
     /// Rate Period
     /// The period over which to increase the rate from rate_min to rate_max.
-    #[structopt(long, default_value = "20")]
+    #[structopt(long, default_value = "0")]
     rate_period: u64,
 }
 

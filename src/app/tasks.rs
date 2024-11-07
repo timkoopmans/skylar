@@ -69,6 +69,7 @@ impl App {
                         let elapsed = start_time.elapsed().as_secs_f64();
 
                         let pacing = Self::calculate_pacing(
+                            opt.readers as f64,
                             opt.rate_min as f64,
                             opt.rate_max as f64,
                             opt.rate_period as f64,
@@ -120,6 +121,7 @@ impl App {
                         let elapsed = start_time.elapsed().as_secs_f64();
 
                         let pacing = Self::calculate_pacing(
+                            opt.writers as f64,
                             opt.rate_min as f64,
                             opt.rate_max as f64,
                             opt.rate_period as f64,
@@ -185,8 +187,16 @@ impl App {
         })
     }
 
-    fn calculate_pacing(rate_min: f64, rate_max: f64, rate_period: f64, elapsed: f64) -> Duration {
+    fn calculate_pacing(
+        threads: f64,
+        rate_min: f64,
+        rate_max: f64,
+        rate_period: f64,
+        elapsed: f64,
+    ) -> Duration {
         let quarter_period = rate_period / 4.0;
+        let rate_min = rate_min / threads;
+        let rate_max = rate_max / threads;
         let rate = if rate_min > 0. && rate_max > 0. {
             let t = elapsed % rate_period;
             if t < quarter_period {

@@ -111,7 +111,7 @@ impl App {
 
                         let payload = W::insert_values(distribution.as_str());
                         if let Err(e) = session.execute_unpaged(&statement, &payload).await {
-                            debug!("Error inserting payload: {}", e);
+                            error!("Error inserting payload: {}", e);
                         }
 
                         if cancellation_token.is_cancelled() {

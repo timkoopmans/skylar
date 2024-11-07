@@ -7,6 +7,7 @@ use rand::prelude::SliceRandom;
 use rand::Rng;
 use rand_distr::{Binomial, Geometric, Normal, Poisson, Zipf};
 use scylla::{FromRow, SerializeRow};
+use std::env;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use uuid::Uuid;
 static SEQUENTIAL_INDEX_A: AtomicUsize = AtomicUsize::new(0);
@@ -42,8 +43,15 @@ static POOL_RACKS: Lazy<Vec<Uuid>> = Lazy::new(|| {
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 
+fn get_cardinality() -> usize {
+    env::var("CARDINALITY")
+        .unwrap_or_else(|_| "1000000".to_string())
+        .parse()
+        .expect("Failed to parse CARDINALITY")
+}
+
 static POOL_SLEDS: Lazy<Vec<Uuid>> = Lazy::new(|| {
-    let size = 100000000;
+    let size = get_cardinality();
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 

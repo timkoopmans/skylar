@@ -50,6 +50,11 @@ struct Opt {
     #[structopt(long, short = 'P', default_value = "timeseries")]
     payload: String,
 
+    /// Cardinality
+    /// The number of unique values to generate.
+    #[structopt(long, short = 'C', default_value = "1000000")]
+    cardinality: u64,
+
     /// Distribution
     /// sequential:
     /// The sequential distribution, where each value is the previous value plus 1.
@@ -97,6 +102,8 @@ async fn main() -> Result<()> {
     let opt = Opt::parse();
     dotenv::dotenv().ok();
     logging::init();
+
+    std::env::set_var("CARDINALITY", opt.cardinality.to_string());
 
     let session = db::connection::builder(true, &opt).await?;
 

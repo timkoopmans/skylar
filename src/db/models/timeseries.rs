@@ -43,7 +43,7 @@ static POOL_RACKS: Lazy<Vec<Uuid>> = Lazy::new(|| {
 });
 
 static POOL_SLEDS: Lazy<Vec<Uuid>> = Lazy::new(|| {
-    let size = 1000000;
+    let size = 100000000;
     (0..size).map(|_| Uuid::new_v4()).collect()
 });
 
